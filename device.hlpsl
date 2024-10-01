@@ -1,0 +1,199 @@
+role device (DEV:agent, KM:agent, NOD:agent,
+	KDSK,KDSK1:symmetric_key,
+	PKKM, PKD, PKN:public_key,
+	H, MUL:hash_func,
+	P,ND,NKM,NNOD,ACK:text,
+	SND, RCV:channel (dy))
+played_by DEV
+def=
+local State:nat,  
+KMaKM, KMrKM, NaN, NrN, DrD, DaD, HD, HD1, HKM, HKM1, HN, HN1, HN2, HNACK, RD, RKM, DtD, KMtKM, KMt1KM, KEnc,NtN,Nt1N:message
+
+	const
+sec_1, sec_2, sec_3, sec_4, sec_5, sec_6,  auth_dev_km_hd, auth_dev_km_hd1, auth_km_dev_hkm, auth_km_dev_hkm1,auth_nod_km_kenc,auth_km_nod_hn,auth_km_nod_hn1,auth_km_nod_hn2: protocol_id
+init State:=0
+
+transition
+
+1. State=0 /\ RCV(start)=|> 
+State':=1 /\DaD':=new()
+/\PKD':=MUL(DaD'.P)
+/\SND(PKD'.ND)
+/\secret(DaD',sec_1,{DEV})
+2. State=1/\RCV(PKKM'.NKM)=|>
+State':=2 /\DrD':=new()
+/\RD':=MUL(DrD'.PKD)
+/\DtD':=new()
+/\HD':=H(RD'.PKD.PKKM'.DtD')
+/\SND(RD'.ND.HD'.{HD'}_DaD.DtD')
+/\secret(DrD',sec_2,{DEV})
+/\witness(DEV,KM,auth_dev_km_hd,HD')
+/\witness(DEV,KM,auth_dev_km_hd1,HD')
+3. State=2/\RCV(RKM'.NKM.HKM'.{HKM}_KMaKM'.KMtKM')=|>
+State':=3 /\HKM':={{HKM'}_KMaKM'}_PKKM
+/\request(KM,DEV,auth_km_dev_hkm,HKM')
+/\HKM1':=H(RKM'.PKKM.PKD.KMtKM')
+/\request(KM,DEV,auth_km_dev_hkm1,HKM1')
+/\KDSK':=MUL(DrD.MUL(DaD.RKM'))
+/\secret(KDSK',sec_6,{DEV,KM,NOD})
+end role
+
+
+role keymanager (KM,DEV:agent, NOD:agent,
+	KDSK,KDSK1:symmetric_key,
+	PKKM,PKD, PKN:public_key,
+	H,MUL:hash_func,
+	P,ND,NKM,NNOD,ACK:text,
+	SND,RCV:channel (dy))
+played_by KM
+
+def=
+local State:nat,
+
+DaD,DrD,KMaKM,KMrKM, KMr1KM, NaN, NrN, HD,HD1,HKM,HKM1,HN,HN1,HN2,HNACK,RD,RKM,DtD,KMtKM,KMt1KM,KEnc,NtN,Nt1N:message
+
+	const
+sec_1, sec_2, sec_3, sec_4, sec_5, sec_6, auth_dev_km_hd, auth_dev_km_hd1, auth_km_dev_hkm, auth_km_dev_hkm1,auth_nod_km_kenc,auth_km_nod_hn,auth_km_nod_hn1,auth_km_nod_hn2:protocol_id
+
+init State:=0
+transition
+
+1. State=0/\RCV(PKD'.ND)=|>
+State':=1 /\ KMaKM':=new()
+/\KMrKM':=new()
+/\PKKM':=MUL(KMaKM'.P)
+/\SND(PKKM'.NKM)
+/\secret(KMrKM',sec_1,{KM})
+/\secret(KMaKM',sec_1,{KM})
+
+2. State=1/\RCV(RD'.ND.HD'.{HD'}_DaD'.DtD')=|>
+State':=2 /\HD':={{HD'}_DaD'}_PKD
+/\request(DEV,KM,auth_dev_km_hd,HD')
+/\HD1':=H(RD'.PKD.PKKM.DtD')
+/\request(DEV,KM,auth_dev_km_hd1,HD1')
+/\RKM':=MUL(KMrKM.PKKM)
+/\KDSK':=MUL(KMrKM.MUL(KMaKM.RD'))%%77
+/\KMtKM':=new()
+/\HKM':=H(RKM'.PKKM.PKD.KMtKM')
+/\SND(RKM'.NKM.HKM'.{HKM}_KMaKM.KMtKM')
+/\secret(KMaKM,sec_3,{KM})
+/\secret(KMrKM,sec_4,{KM})
+/\witness(KM,DEV,auth_km_dev_hkm,HKM')
+/\witness(KM,DEV,auth_km_dev_hkm1,HKM')
+
+3. State=2/\RCV(PKN.NNOD)=|>
+State':=3
+
+4. State=3/\RCV(ND.NNOD.HN'.{HN'}_NaN.NtN')=|>
+State':=4 /\HN':={{HN'}_NaN}_PKN
+/\request(KM,NOD,auth_km_nod_hn,HN')
+/\HN1':=H(KDSK.PKN.PKKM.NtN')
+/\request(KM,NOD,auth_km_nod_hn1,HN1')
+/\KEnc':={KDSK}_PKN
+/\KMt1KM':=new()
+/\HN2':=H(KEnc'.PKKM.PKN.KMt1KM')
+/\SND(KEnc'.NKM.HN2'.{KEnc'}_KMaKM.KMt1KM')
+/\witness(NOD,KM,auth_nod_km_kenc,KEnc')
+
+4. State=4/\RCV(ACK.NNOD.HNACK'.{HNACK'}_NaN.Nt1N')=|>
+State':=5 /\HNACK':={{HNACK'}_NaN}_PKN
+/\request(KM,NOD,auth_km_nod_hn2,HNACK')
+
+end role
+
+role node (NOD:agent, KM:agent, DEV:agent, 
+	KDSK,KDSK1:symmetric_key,
+	PKKM, PKD, PKN:public_key,
+	H, MUL:hash_func,
+	P,ND,NKM,NNOD,ACK:text,
+	SND, RCV:channel (dy))
+played_by NOD
+def=
+local State:nat,  
+KMaKM, KMrKM, DrD, DaD, NrN, NaN, HD, HD1, HKM, HKM1, HN,HN1,HN2,HNACK, RD, RKM, RN, DtD, KMtKM, KMt1KM,KEnc,NtN,Nt1N:message
+
+	const
+sec_1, sec_2, sec_3, sec_4, sec_5, sec_6,  auth_dev_km_hd, auth_dev_km_hd1, auth_km_dev_hkm, auth_km_dev_hkm1,auth_nod_km_kenc,auth_km_nod_hn,auth_km_nod_hn1,auth_km_nod_hn2: protocol_id
+init State:=0
+
+transition
+
+1. State=0 /\ RCV(start)=|> 
+State':=1 /\NaN':=new()
+/\PKN':=MUL(NaN'.P)
+/\SND(PKN'.NNOD)
+/\secret(NaN',sec_5,{NOD})
+
+2. State=1/\RCV(PKKM'.NKM)=|>
+State':=2 /\NtN':=new()
+/\HN':=H(KDSK1.PKN.PKKM.NtN')
+/\SND(ND.NNOD.HN'.{HN'}_NaN.NtN')
+/\witness(KM,NOD,auth_km_nod_hn,HN')
+/\witness(KM,NOD,auth_km_nod_hn1,HN')
+
+3. State=2/\RCV(KEnc'.NKM.HN2'.{KEnc'}_KMaKM.KMt1KM')=|>
+State':=3 /\KEnc':={({KEnc'}_KMaKM)}_PKKM
+/\request(NOD,KM,auth_nod_km_kenc,KEnc')
+/\KDSK':={KEnc'}_NaN
+/\Nt1N':=new()
+/\HNACK':=H(KDSK.PKN.PKKM.Nt1N')
+/\SND(ACK.NNOD.HNACK'.{HNACK'}_NaN.Nt1N')
+/\witness(KM,NOD,auth_km_nod_hn2,HNACK')
+
+end role
+
+role session(DEV:agent,KM:agent, NOD:agent,
+	KDSK,KDSK1:symmetric_key,
+	PKKM,PKD,PKN:public_key,
+	H,MUL:hash_func,
+	P,ND,NKM,NNOD,ACK:text)
+
+def=
+local SND1,RCV1,SND2,RCV2,SND3,RCV3:channel(dy)
+	composition
+device (DEV,KM,NOD,KDSK,KDSK1,PKKM,PKD,PKN,H,MUL,P,ND,NKM,NNOD,ACK,SND1,RCV1)
+/\keymanager (KM,DEV,NOD,KDSK,KDSK1,PKKM,PKD,PKN,H,MUL,P,ND,NKM,NNOD,ACK,SND2,RCV2)
+/\ node (NOD,KM,DEV,KDSK,KDSK1,PKKM,PKD,PKN,H,MUL,P,ND,NKM,NNOD,ACK,SND3,RCV3)
+
+end role
+
+role environment()
+def=
+	const
+	dev,km,nod:agent,
+	kdsk,kdsk1:symmetric_key,
+	pkkm,pkd,pkn:public_key,
+	h,mul:hash_func,
+	p,nd,nkm,nnod,ack:text,
+	
+	dad, drd, kmakm, kmrkm : text,
+	hd,hkm,hn,hn1,hn2,hnack,rd,rkm,dtd,kmtkm,kmt1km,kenc,ntn,nt1n:message,
+	sec_1, sec_2, sec_3, sec_4, sec_5, sec_6, auth_dev_km_hd, auth_dev_km_hd1, auth_km_dev_hkm, auth_km_dev_hkm1,auth_nod_km_kenc,auth_km_nod_hn,auth_km_nod_hn1,auth_km_nod_hn2: protocol_id%%115
+
+	intruder_knowledge = {dev, km, nkm, nd, p,nd,nkm, nnod, ack, pkkm, pkd, pkn, drd, hd, dtd, kmrkm, hkm, hn,hn1, hn2, hnack, kmtkm, kmt1km,kenc,ntn,nt1n}
+
+	composition
+		session(dev,km,nod,kdsk,kdsk1,pkkm,pkd,pkn,h,mul,p,nd,nkm,nnod,ack)
+		/\ session(km,dev,nod,kdsk,kdsk1,pkkm,pkd,pkn,h,mul,p,nd,nkm,nnod,ack) 
+		/\ session(nod,km,dev,kdsk,kdsk1,pkkm,pkd,pkn,h,mul,p,nd,nkm,nnod,ack)
+		
+
+end role
+
+goal
+	secrecy_of sec_1
+	secrecy_of sec_2
+	secrecy_of sec_3
+	secrecy_of sec_4
+	secrecy_of sec_5
+	secrecy_of sec_6
+	authentication_on auth_dev_km_hd
+	authentication_on auth_dev_km_hd1
+	authentication_on auth_km_dev_hkm
+	authentication_on auth_km_dev_hkm1
+	authentication_on auth_km_nod_hn
+	authentication_on auth_km_nod_hn1
+	authentication_on auth_km_nod_hn2
+	authentication_on auth_nod_km_kenc
+end goal
+environment()
